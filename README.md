@@ -8,6 +8,7 @@ This repository is the public short-link site (hosted on Vercel). Every page ope
 |---|---|
 | `/` | The organisation's events |
 | `/org/` | Organisation admin: create and edit events, set each event's PINs |
+| `/request/?event=<id>` | Public vehicle request form for one event (no PIN), with request status check |
 | `/driver/?event=<id>` | Driver app for one event |
 | `/board/?event=<id>` | Live board for one event |
 | `/admin/?event=<id>` | Admin for one event: calendar, trips, fleet, auto-assign |
