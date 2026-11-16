@@ -8,27 +8,9 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/icon-180.png">
 <link rel="manifest" href="/manifest.webmanifest">
-<title>Organisation · TranspoDesk</title>
-<style>
-html,body{margin:0;height:100%;background:#f4f6fa;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-iframe{border:0;width:100%;height:100%;display:block}
-#splash{position:fixed;inset:0;background:#0E244D;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .4s}
-#splash img{width:min(320px,70vw)}
-#splash span{color:#9fb3d9;font-size:14px}
-</style>
+<title>Admin · TranspoDesk</title>
+<meta http-equiv="refresh" content="0; url=/admin/">
+<script>location.replace('/admin/' + location.search);</script>
 </head>
-<body>
-<div id="splash"><img src="/logo.png" alt="TranspoDesk"><span>Loading...</span></div>
-<script>
-  // Opens the TranspoDesk app (org page). Any ?event=... in this page's address is passed on.
-  // credentialless: the app opens without the browser's Google sign-ins, so it works even when
-  // several Google accounts are signed in (the same as incognito).
-  var f = document.createElement('iframe');
-  f.setAttribute('credentialless', '');
-  f.title = 'TranspoDesk';
-  f.src = 'https://script.google.com/macros/s/AKfycbwJ4tWSJUapxeUBZSHcg-AOkjlljz6eD1uomsYFvw3KOK7RhlLYEZ-XzzY0dyYW5Cnm/exec?page=org' + (location.search ? '&' + location.search.slice(1) : '');
-  f.onload = function () { var s = document.getElementById('splash'); setTimeout(function () { s.style.opacity = 0; setTimeout(function () { s.remove(); }, 400); }, 600); };
-  document.body.appendChild(f);
-</script>
-</body>
+<body><p style="font-family:system-ui;padding:20px">Organisation tools are now in <a href="/admin/">Admin</a>.</p></body>
 </html>
