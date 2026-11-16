@@ -2,18 +2,16 @@
 
 Event transport dispatch: auto-assigns vehicles and drivers to trip requests, with a live board, driver app, and Google Calendar-style schedule. Built on Google Sheets + Apps Script.
 
-This repository is the public short-link site (hosted on Vercel):
+This repository is the public short-link site (hosted on Vercel). Every page opens the same Apps Script web app:
 
 | Link | Opens |
 |---|---|
-| `/` | Home page with links for the current event |
-| `/driver/` | Driver app: own trips, status buttons, tentative all-trips view |
-| `/board/` | Live board for the committee desk |
-| `/admin/` | Admin: calendar, trips editor, fleet editor, auto-assign |
+| `/` | The organisation's events |
+| `/org/` | Organisation admin: create and edit events, set each event's PINs |
+| `/driver/?event=<id>` | Driver app for one event |
+| `/board/?event=<id>` | Live board for one event |
+| `/admin/?event=<id>` | Admin for one event: calendar, trips, fleet, auto-assign |
 
-Each page shows the Apps Script web app inside a `credentialless` iframe, so it opens even when several Google accounts are signed in to the browser (Apps Script web apps otherwise fail with "page not found" in that case).
-
-## Reusing for another event
-1. Copy the event's Google Sheet and Apps Script project, deploy the copy as a web app.
-2. Replace the `/exec` URL in `admin/`, `driver/` and `board/index.html`, and the event name on `index.html`.
-3. Push to `main`; Vercel publishes automatically.
+Events are created on the Organisation page, so this site never needs editing for a new event.
+Each page shows the app inside a `credentialless` iframe, so it opens even when several Google
+accounts are signed in to the browser (Apps Script web apps otherwise fail in that case).
