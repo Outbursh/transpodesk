@@ -12,23 +12,130 @@
 <style>
 html,body{margin:0;height:100%;background:#f4f6fa;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 iframe{border:0;width:100%;height:100%;display:block}
-#splash{position:fixed;inset:0;background:#0E244D;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .4s}
+#splash{position:fixed;inset:0;background:#0E244D;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .4s;z-index:5}
 #splash img{width:min(320px,70vw)}
 #splash span{color:#9fb3d9;font-size:14px}
+/* Offline view: shown when the app cannot load (no signal) */
+#off{position:fixed;inset:0;overflow:auto;background:#f4f6fa;z-index:10;color:#1b2333}
+#off .bar{background:#0E244D;color:#fff;padding:14px 16px;border-bottom:3px solid #2ec4a6}
+#off .bar b{font-size:18px;display:block}#off .bar span{font-size:13px;color:#c9d6ee}
+#off .wrap{max-width:640px;margin:0 auto;padding:14px}
+#off .banner{background:#fff4e5;border:1px solid #f1c27d;color:#7a4b00;border-radius:12px;padding:10px 12px;font-size:14px;margin-bottom:12px}
+#off .card{background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.08);padding:14px;margin-bottom:12px}
+#off .time{font-size:20px;font-weight:800}
+#off .muted{color:#667085;font-size:13px}
+#off .st{float:right;font-size:12px;font-weight:700;background:#eef2f7;border-radius:8px;padding:3px 8px}
+#off .place{font-weight:600}
+#off .acts{display:flex;gap:6px;margin-top:10px}
+#off button{flex:1;border:1px solid #d0d5dd;background:#fff;border-radius:10px;padding:11px 6px;font-size:14px;font-weight:700}
+#off button.on{background:#0E244D;color:#fff;border-color:#0E244D}
+#off .wait{display:inline-block;margin-top:6px;font-size:12px;font-weight:700;color:#7a4b00;background:#fff4e5;border-radius:8px;padding:3px 8px}
+#off .retry{width:100%;background:#0E244D;color:#fff;border:0;margin-top:4px}
+#off a{color:#1a56db}
 </style>
 </head>
 <body>
 <div id="splash"><img src="/logo.png" alt="TranspoDesk"><span>Loading...</span></div>
+<div id="off" hidden>
+  <div class="bar"><b id="offTitle">Driver</b><span id="offSub">Offline</span></div>
+  <div class="wrap"><div class="banner" id="offBanner"></div><div id="offTrips"></div>
+    <button class="retry" onclick="retry()">Try again</button>
+    <button style="width:100%;margin-top:8px" onclick="hideOff()">Back to the app</button></div>
+</div>
 <script>
   // Opens the TranspoDesk app (driver page). Any ?event=... in this page's address is passed on.
   // credentialless: the app opens without the browser's Google sign-ins, so it works even when
   // several Google accounts are signed in (the same as incognito).
+  var APP = 'https://script.google.com/macros/s/AKfycbwJ4tWSJUapxeUBZSHcg-AOkjlljz6eD1uomsYFvw3KOK7RhlLYEZ-XzzY0dyYW5Cnm/exec?page=driver' + (location.search ? '&' + location.search.slice(1) : '');
   var f = document.createElement('iframe');
   f.setAttribute('credentialless', '');
   f.title = 'TranspoDesk';
-  f.src = 'https://script.google.com/macros/s/AKfycbwJ4tWSJUapxeUBZSHcg-AOkjlljz6eD1uomsYFvw3KOK7RhlLYEZ-XzzY0dyYW5Cnm/exec?page=driver' + (location.search ? '&' + location.search.slice(1) : '');
-  f.onload = function () { var s = document.getElementById('splash'); setTimeout(function () { s.style.opacity = 0; setTimeout(function () { s.remove(); }, 400); }, 600); };
+  f.src = APP;
+  var loaded = false;
+  f.onload = function () { loaded = true; var s = document.getElementById('splash'); if (!s) return; setTimeout(function () { s.style.opacity = 0; setTimeout(function () { s.remove(); }, 400); }, 600); };
   document.body.appendChild(f);
+
+  // ---------------------------------------------------------------- offline support
+  // The app sends this page a copy of the driver's trips each time they load, and any status taps it could not send.
+  // This page keeps them on the phone (they survive closing the browser) and, when the app cannot load because there
+  // is no signal, shows the saved trips itself. Taps made here are handed back to the app when the signal returns.
+  var EVENT = new URLSearchParams(location.search).get('event') || '';
+  var KC = 'tdo_cache_' + EVENT, KQ = 'tdo_queue_' + EVENT, ready = false;
+  function get(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } }
+  function put(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function fromApp(origin) { try { return /-script\.googleusercontent\.com$/.test(new URL(origin).hostname); } catch (e) { return false; } }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  window.addEventListener('message', function (e) {
+    var m = e.data;
+    if (!fromApp(e.origin) || !m || !m.td || (m.event && m.event !== EVENT)) return;
+    if (m.type === 'ready') {
+      ready = true; hideOff();
+      e.source.postMessage({ td: 1, type: 'state', event: EVENT, queue: get(KQ, []), cache: get(KC, null) }, e.origin);
+    } else if (m.type === 'cache') { put(KC, m.cache); }
+    else if (m.type === 'queue') { put(KQ, m.queue || []); }
+    else if (m.type === 'clear') { put(KC, null); }
+  });
+
+  function showOff() {
+    if (ready) return;
+    var s = document.getElementById('splash'); if (s) s.remove();
+    document.getElementById('off').hidden = false; renderOff();
+  }
+  function hideOff() { document.getElementById('off').hidden = true; }
+  function retry() { document.getElementById('offBanner').textContent = 'Trying to connect...'; ready = false; f.src = APP; setTimeout(function () { if (!ready) renderOff(); }, 15000); }
+
+  function renderOff() {
+    var c = get(KC, null), q = get(KQ, []);
+    var banner = document.getElementById('offBanner'), box = document.getElementById('offTrips');
+    if (!c || !c.trips) {
+      document.getElementById('offTitle').textContent = 'Driver';
+      banner.innerHTML = '<b>No signal.</b> No trips are saved on this phone yet. Open this page once with signal to save them. Call or text the dispatcher for your schedule.';
+      box.innerHTML = ''; return;
+    }
+    document.getElementById('offTitle').textContent = c.vehicle;
+    document.getElementById('offSub').textContent = (c.driver ? c.driver + ' · ' : '') + 'Offline · trips for ' + c.date;
+    var mine = q.filter(function (x) { return x.vehicle === c.vehicle; });
+    banner.innerHTML = '<b>No signal.</b> Showing trips saved at ' + esc(c.savedAt) + '. The schedule may have changed since. ' +
+      (mine.length ? mine.length + (mine.length === 1 ? ' update is' : ' updates are') + ' kept on this phone and will be sent when the signal returns. ' : 'Taps are kept on this phone and sent when the signal returns. ') +
+      'Call or text the dispatcher if it is urgent.';
+    box.innerHTML = c.trips.length ? c.trips.map(function (t, i) {
+      var waits = mine.filter(function (x) { return x.id === t.id; });
+      return '<div class="card"><span class="st">' + esc(t.status || 'Pending') + '</span>' +
+        '<div class="time">' + esc(t.start ? t.start + (t.end ? ' – ' + t.end : '') : 'Time to be confirmed') + '</div>' +
+        '<div class="muted">' + esc(t.id) + '</div>' +
+        '<div style="margin-top:6px"><b>' + esc(t.pax || 'Passengers not listed') + '</b>' + (t.paxCount ? ' <span class="muted">(' + esc(t.paxCount) + ')</span>' : '') + '</div>' +
+        (t.paxContact ? '<div class="muted">Contact: ' + esc(t.paxContact).replace(/(\+?\d[\d\s-]{6,}\d)/g, function (m) { return '<a href="tel:' + m.replace(/[\s-]/g, '') + '">' + m + '</a>'; }) + '</div>' : '') +
+        '<div style="margin-top:6px" class="muted">Pick-up</div><div class="place">' + esc(t.pickup || '—') + '</div>' +
+        '<div class="muted">Drop-off</div><div class="place">' + esc(t.dropoff || '—') + '</div>' +
+        (t.flight ? '<div class="muted">✈ ' + esc(t.flight) + '</div>' : '') +
+        (waits.length ? '<div class="wait">⏳ Waiting for signal: ' + esc(waits.map(function (w) { return w.status + ' ' + w.at; }).join(', ')) + '</div>' : '') +
+        '<div class="acts">' + ['En route|On the way', 'Picked up|Picked up', 'Completed|Completed'].map(function (s) {
+          var p = s.split('|');
+          return '<button class="' + (t.status === p[0] ? 'on' : '') + '" onclick="tap(' + i + ',\'' + p[0] + '\',this)">' + p[1] + '</button>';
+        }).join('') + '</div></div>';
+    }).join('') : '<div class="card muted">No trips were saved for this date.</div>';
+  }
+
+  function tap(i, status, el) {
+    if (status === 'Completed' && el.dataset.armed !== '1') {      // two taps to confirm
+      el.dataset.armed = '1'; el.textContent = 'Tap again'; setTimeout(function () { el.dataset.armed = ''; el.textContent = 'Completed'; }, 3000); return;
+    }
+    var c = get(KC, null), q = get(KQ, []), t = c.trips[i];
+    q.push({ kind: 'status', id: t.id, status: status, vehicle: c.vehicle, ts: Date.now(),
+             at: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) });
+    t.status = status; put(KC, c); put(KQ, q); renderOff();
+  }
+
+  // No signal when the page opens, or the app does not answer within 15 seconds: show the saved trips
+  // (a page that started loading gets 35 seconds before the saved copy is shown, for slow connections)
+  if (!navigator.onLine) showOff();
+  else { setTimeout(function () { if (!ready && !loaded) showOff(); }, 15000); setTimeout(function () { if (!ready) showOff(); }, 35000); }
+  window.addEventListener('online', function () { if (!document.getElementById('off').hidden) retry(); });
+  window.addEventListener('offline', function () { if (!ready) showOff(); });
+
+  // Keep this page on the phone so it opens with no signal
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/driver/sw.js').catch(function () {});
 </script>
 </body>
 </html>
